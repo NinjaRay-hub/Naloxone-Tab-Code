@@ -1,44 +1,84 @@
 #include <Servo.h>
 
 // Constants
-const int pulsePin = A0;    // Analog input pin for pulse sensor
-const int threshold = 80;   // Threshold blood rate value
-const int servoPin = 9;     // Digital output pin for servo motor
-const int servoOpenAngle = 90;   // Angle to open syringe for drug delivery
-const int servoCloseAngle = 0;   // Angle to close syringe after drug delivery
+const int pulsePin = A0;              // Analog input pin for pulse sensor
+const int servoPin = 9;               // Digital output pin for servo motor
+const int servoOpenAngle = 90;        // Angle to open syringe for drug delivery
+const int servoCloseAngle = 0;        // Angle to close syringe after drug delivery
 
-// Variables
-int pulseValue = 0;         // Current blood rate value
-bool cureAdministered = false;  // Flag to track if cure has been administered
+const int fastHeartbeatThreshold = 100;   // Threshold for fast heartbeat (Tachycardia)
+const int slowHeartbeatThreshold = 60;    // Threshold for slow heartbeat (Bradycardia)
+const int irregularThreshold = 200;       // Threshold for detecting irregular pulse interval (Arrhythmia)
 
-Servo syringeServo;        // Create a servo object to control the syringe
+bool cureAdministered = false;            // Flag to track if cure has been administered
+
+Servo syringeServo;                       // Create a servo object to control the syringe
+
+// Variables for heartbeat detection
+unsigned long lastPulseTime = 0;          // Time of the last detected pulse
+unsigned long currentTime = 0;            // Current time
+unsigned long pulseInterval = 0;          // Interval between two consecutive pulses
+unsigned long previousInterval = 0;       // Store the previous interval to detect irregularity
+int pulseValue = 0;                       // Store the pulse sensor value
+int bpm = 0;                              // Calculated beats per minute
 
 void setup() {
-  Serial.begin(9600);      // Initialize serial communication
-  pinMode(pulsePin, INPUT);  // Set pulse pin as input
-  pinMode(servoPin, OUTPUT); // Set servo pin as output
-  syringeServo.attach(servoPin);  // Attach servo to its pin
+  Serial.begin(9600);                     // Initialize serial communication
+  pinMode(pulsePin, INPUT);               // Set pulse pin as input
+  pinMode(servoPin, OUTPUT);              // Set servo pin as output
+  syringeServo.attach(servoPin);          // Attach servo to its pin
 }
 
 void loop() {
-  // Read pulse sensor value
-  pulseValue = analogRead(pulsePin);
-  
-  // Check if blood rate exceeds threshold
-  if (pulseValue > threshold && !cureAdministered) {
-    administerCure();
-    cureAdministered = true;
+  pulseValue = analogRead(pulsePin);      // Read the pulse sensor value
+
+  // Detect pulse peaks (you may need to adjust threshold based on your sensor)
+  if (pulseValue > 512) {                 // Threshold to detect a "beat" (depends on sensor)
+    currentTime = millis();               // Get the current time in milliseconds
+    pulseInterval = currentTime - lastPulseTime;  // Calculate the time between pulses
+    lastPulseTime = currentTime;          // Update the last pulse time
+
+    // Calculate the BPM (beats per minute)
+    bpm = 60000 / pulseInterval;
+
+    // Detect Fast Heartbeat (Tachycardia)
+    if (bpm > fastHeartbeatThreshold && !cureAdministered) {
+      Serial.println("Fast Heartbeat Detected: Administering Cure (Tachycardia)");
+      administerCure();
+      cureAdministered = true;
+    }
+
+    // Detect Slow Heartbeat (Bradycardia)
+    if (bpm < slowHeartbeatThreshold && !cureAdministered) {
+      Serial.println("Slow Heartbeat Detected: Administering Cure (Bradycardia)");
+      administerCure();
+      cureAdministered = true;
+    }
+
+    // Detect Irregular Heartbeat (Arrhythmia)
+    if (abs(pulseInterval - previousInterval) > irregularThreshold && !cureAdministered) {
+      Serial.println("Irregular Heartbeat Detected: Administering Cure (Arrhythmia)");
+      administerCure();
+      cureAdministered = true;
+    }
+
+    // Store the previous interval for irregularity comparison
+    previousInterval = pulseInterval;
   }
-  
-  // Reset flag if blood rate drops below threshold
-  if (pulseValue <= threshold) {
+
+  // Reset the cure administration flag if heartbeat normalizes
+  if (bpm >= slowHeartbeatThreshold && bpm <= fastHeartbeatThreshold) {
     cureAdministered = false;
   }
-  
-  // Print pulse value for debugging
-  Serial.print("Pulse value: ");
-  Serial.println(pulseValue);
-  
+
+  // Print debugging information
+  Serial.print("Pulse Value: ");
+  Serial.print(pulseValue);
+  Serial.print(" | BPM: ");
+  Serial.print(bpm);
+  Serial.print(" | Interval: ");
+  Serial.println(pulseInterval);
+
   delay(1000);  // Delay for stability
 }
 
@@ -46,9 +86,8 @@ void administerCure() {
   // Open syringe to administer cure
   syringeServo.write(servoOpenAngle);
   delay(1000);  // Wait for drug delivery
-  
+
   // Close syringe after drug delivery
   syringeServo.write(servoCloseAngle);
 }
-
 

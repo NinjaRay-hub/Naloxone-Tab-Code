@@ -8,7 +8,7 @@ const int servoCloseAngle = 0;        // Angle to close syringe after drug deliv
 
 const int fastHeartbeatThreshold = 100;   // Threshold for fast heartbeat (Tachycardia)
 const int slowHeartbeatThreshold = 60;    // Threshold for slow heartbeat (Bradycardia)
-const int irregularThreshold = 200;       // Threshold for detecting irregular pulse interval (Arrhythmia)
+const int irregularThreshold = 120;       // Threshold for detecting irregular pulse interval (Arrhythmia)
 
 bool cureAdministered = false;            // Flag to track if cure has been administered
 
